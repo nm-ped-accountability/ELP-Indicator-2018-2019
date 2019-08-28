@@ -1,7 +1,8 @@
 ### ELP Indicator 201-2018
 
 
-# Load data ---------------------------------------------------------------
+
+# Load Data ---------------------------------------------------------------
 
 library(tidyverse)
 
@@ -25,9 +26,8 @@ schools <- read.csv("Master Schools 2019 V4.csv",
 schools18 <- schools[schools$ï..SY == 2018, ]
 
 
-# Match year0 and year1 ---------------------------------------------------
 
-# SY 2016-2017
+# Data Cleaning and Preparation -------------------------------------------
 
 # clean up year0
 year0 <- year0_raw %>%
@@ -41,10 +41,12 @@ year0 <- year0_raw %>%
            grade = Grade,
            pl = Composite..Overall..Proficiency.Level,
            sy = 2017) %>%
-    select(distcode, schcode, schnumb, stid, grade, pl, sy)
+    select(distcode, schcode, schnumb, stid, grade, pl, sy) %>%
+    filter(distcode < 600 & !is.na(pl)) # there are BIE schools in the file
 
 head(year0)
-year0[duplicated(year0$stid), ]
+year0[duplicated(year0$stid), ] # no duplicates
+
 
 # clean up year1
 year1 <- year1_raw %>%
@@ -52,9 +54,31 @@ year1 <- year1_raw %>%
     mutate(schnumb = test_schnumb,
            pl = PL_composite,
            sy = 2018) %>%
-    select(distcode, schcode, schnumb, stid, grade, pl, sy)
+    select(distcode, schcode, schnumb, stid, grade, pl, sy) %>%
+    filter(distcode < 600 & !is.na(pl))
 
 head(year1)
+year1[duplicated(year1$stid), ] # no duplicates
+
+
+# clean up year2
+year2 <- year2_raw %>%
+    select(test_schnumb, distcode, schcode, stid, test_grade_read, PL_composite) %>%
+    mutate(schnumb = test_schnumb,
+           grade = test_grade_read,
+           pl = PL_composite,
+           sy = 2019) %>%
+    select(distcode, schcode, schnumb, stid, grade, pl, sy) %>%
+    filter(distcode < 600 & !is.na(pl))
+
+head(year2)
+year2[duplicated(year2$stid), ] # no duplicates
+
+
+
+# Two-Year Growth (year0, year1) ------------------------------------------
+
+# SY 2016-2017
 
 # merge year0 and year1 and add target scores
 year0100 <- left_join(year1, year0, by = "stid") %>%
@@ -73,6 +97,7 @@ year0100 <- left_join(year1, year0, by = "stid") %>%
 
 head(year0100)
 
+
 # define function
 ELP_indicator <- function(dataset, code) {
     dataset %>%
@@ -83,6 +108,7 @@ ELP_indicator <- function(dataset, code) {
                   mean_diff = mean(diff),
                   n_students = n())
 }
+
 
 # calculate school-level, district-level, and state-level rates
 school_level <- ELP_indicator(year0100, "schnumb") %>%
@@ -132,3 +158,31 @@ final <- rbind(school_level, district_level, state_level) %>%
     arrange(schnumb)
 
 head(final)
+
+# save output
+date <- Sys.Date()
+file_name <- paste0("ELP Indicator 2017-2018 ", date, ".csv")
+write.csv(final, file = file_name, row.names = FALSE)
+
+
+
+# Three-Year Growth (year0, year1, year2) ---------------------------------
+
+# SY 2018-2019
+
+# merge year2 and year1
+year0201 <- left_join(year2, year1, by = "stid") %>%
+    select(distcode.x, schcode.x, schnumb.x, stid, grade.x, pl.x, grade.y, pl.y) %>%
+    rename(distcode = distcode.x,
+           schcode = schcode.x,
+           schnumb = schnumb.x,
+           grade02 = grade.x,
+           pl02 = pl.x,
+           grade01 = grade.y,
+           pl01 = pl.y)
+
+# merge year0201 and year0
+year020100 <- left_join(year0201, year0, by = "stid") %>%
+    select()
+
+names(year020100)
