@@ -44,6 +44,7 @@ year0 <- year0_raw %>%
     select(distcode, schcode, schnumb, stid, grade, pl, sy)
 
 head(year0)
+year0[duplicated(year0$stid), ]
 
 # clean up year1
 year1 <- year1_raw %>%
@@ -68,7 +69,7 @@ year0100 <- left_join(year1, year0, by = "stid") %>%
     left_join(target, by = c("grade", "year00")) %>%
     mutate(diff = pl01 - year01,
            met = diff >= 0,
-           statecode = 999)
+           statecode = 0)
 
 head(year0100)
 
@@ -105,19 +106,23 @@ district_level <- ELP_indicator(year0100, "distcode") %>%
            schcode = 0,
            schname = "Districtwide",
            HS = NA,
+           percent_met = percent_met * 100,
            total_points = NA,
            points = NA)
+
+district_level <- district_level[!duplicated(district_level$distcode), ]
 
 head(district_level)
 
 state_level <- ELP_indicator(year0100, "statecode") %>%
     rename(distcode = `dataset[[code]]`) %>%
-    mutate(schcode = 999,
-           schnumb = 999999,
+    mutate(schcode = 0,
+           schnumb = 0,
            AGAID = NA,
            distname = "Statewide",
            schname = "Statewide",
            HS = NA,
+           percent_met = percent_met * 100,
            total_points = NA,
            points = NA)
 
@@ -125,4 +130,5 @@ head(state_level)
 
 final <- rbind(school_level, district_level, state_level) %>%
     arrange(schnumb)
-final
+
+head(final)
