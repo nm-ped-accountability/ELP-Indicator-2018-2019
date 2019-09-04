@@ -162,7 +162,7 @@ head(final)
 # save output
 date <- Sys.Date()
 file_name <- paste0("ELP Indicator 2017-2018 ", date, ".csv")
-write.csv(final, file = file_name, row.names = FALSE)
+write.csv(final, file = file_name, row.names = FALSE, na = "")
 
 
 
