@@ -250,13 +250,13 @@ head(final_2)
 # Save Outputs ------------------------------------------------------------
 
 # one-year growth (SY 2017-2018)
-date <- Sys.Date()
-file_name <- paste0("ELP Indicator 2017-2018 ", date, ".csv")
+current_date <- Sys.Date()
+file_name <- paste0("ELP Indicator 2017-2018 ", current_date, ".csv")
 write.csv(final_1, file = file_name, row.names = FALSE, na = "")
 
 
 # two-year growth (SY 2018-2019)
-data <- Sys.Date()
-file_name <- paste0("ELP Indicator 2018-2019 ", date, "csv")
+current_data <- Sys.Date()
+file_name <- paste0("ELP Indicator 2018-2019 ", current_date, ".csv")
 write.csv(final_2, file = file_name, row.names = FALSE, na = "")
 
