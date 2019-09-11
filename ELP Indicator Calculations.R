@@ -138,7 +138,6 @@ names(year020100)
 
 # Define Functions --------------------------------------------------------
 
-
 # ELP_indicator
 ELP_indicator <- function(dataset, code) {
     dataset %>%
@@ -149,7 +148,6 @@ ELP_indicator <- function(dataset, code) {
                   mean_diff = mean(diff),
                   n_students = n())
 }
-
 
 # school_level
 school_level <- function(dataset) {
@@ -165,46 +163,45 @@ school_level <- function(dataset) {
 }
 
 # district_level
-district_level <- ELP_indicator(year0100, "distcode") %>%
-    rename(distcode = `dataset[[code]]`) %>%
-    left_join(schools18, by = "distcode") %>%
-    select(distcode, distname, percent_met, mean_diff, n_students) %>%
-    mutate(schnumb = distcode * 1000,
-           AGAID = NA,
-           schcode = 0,
-           schname = "Districtwide",
-           HS = NA,
-           percent_met = percent_met * 100,
-           total_points = NA,
-           points = NA)
-
-district_level <- district_level[!duplicated(district_level$distcode), ]
-
-head(district_level)
-
+district_level <- function(dataset) {
+    dat <- ELP_indicator(dataset, "distcode") %>%
+        rename(distcode = `dataset[[code]]`) %>%
+        left_join(schools18, by = "distcode") %>%
+        select(distcode, distname, percent_met, mean_diff, n_students) %>%
+        mutate(schnumb = distcode * 1000,
+               agaid = NA,
+               schcode = 0,
+               schname = "Districtwide",
+               hs = NA,
+               percent_met = percent_met * 100,
+               total_points = NA,
+               points = NA)
+        dat <- dat[!duplicated(dat$distcode), ]
+}
 
 # state_level
-state_level <- ELP_indicator(year0100, "statecode") %>%
-    rename(distcode = `dataset[[code]]`) %>%
-    mutate(schcode = 0,
-           schnumb = 0,
-           AGAID = NA,
-           distname = "Statewide",
-           schname = "Statewide",
-           HS = NA,
-           percent_met = percent_met * 100,
-           total_points = NA,
-           points = NA)
-
-head(state_level)
-
+state_level <- function(dataset) {
+    dat <- ELP_indicator(dataset, "statecode") %>%
+        rename(distcode = `dataset[[code]]`) %>%
+        mutate(schcode = 0,
+               schnumb = 0,
+               AGAID = NA,
+               distname = "Statewide",
+               schname = "Statewide",
+               HS = NA,
+               percent_met = percent_met * 100,
+               total_points = NA,
+               points = NA)    
+}
 
 
 
 # Run Functions -----------------------------------------------------------
 
+# two-year growth (SY 2017-2018)
 school_ELP <- school_level(year0100)
-head(school_ELP)
+district_ELP <- district_level(year0100)
+state_ELP <- state_level(year0100)
 
 
 
