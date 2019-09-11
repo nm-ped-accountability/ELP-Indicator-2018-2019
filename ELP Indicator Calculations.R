@@ -41,8 +41,14 @@ nrow(schools19) # N = 1802
 year0 <- year0_raw %>%
     select(District.Number, School.Number, State.Student.ID, 
            Grade, Composite..Overall..Proficiency.Level) %>%
+    
+    # remove students who do not have SSIDs
     filter(!is.na(State.Student.ID)) %>%
+    
+    # remove students who do not have composite scores
     filter(!is.na(Composite..Overall..Proficiency.Level)) %>%
+    
+    # formatting
     mutate(distcode = as.numeric(gsub("NM", "", District.Number)),
            schcode = School.Number,
            schnumb = distcode * 1000 + schcode,
@@ -51,7 +57,9 @@ year0 <- year0_raw %>%
            pl = Composite..Overall..Proficiency.Level,
            sy = 2017) %>%
     select(distcode, schcode, schnumb, stid, grade, pl, sy) %>%
-    filter(distcode < 600 & !is.na(pl)) # there are BIE schools in the file
+    
+    # remove BIE schools
+    filter(distcode < 600 & !is.na(pl))
 
 head(year0)
 
@@ -64,6 +72,7 @@ table(year0$grade) # 0-12
 
 
 ## Tidy Year1 =============================================================
+# this data file has already be tidied (no BIE, no missing composite PLs)
 year1 <- year1_raw %>%
     select(test_schnumb, distcode, schcode, stid, grade, PL_composite) %>%
     mutate(schnumb = test_schnumb,
@@ -83,6 +92,7 @@ table(year1$grade) # 0-12
 
 
 ## Tidy Year2 =============================================================
+# this data file has already be tidied (no BIE, no missing composite PLs)
 year2 <- year2_raw %>%
     select(test_schnumb, distcode, schcode, stid, STARS_grade, PL_composite) %>%
     mutate(schnumb = test_schnumb,
@@ -115,23 +125,32 @@ year0100 <- left_join(year1, year0, by = "stid") %>%
            schnumb = schnumb.x,
            grade01 = grade.x,
            pl01 = pl.x,
-           grade = grade.y,
-           year00 = pl.y) %>%
+           grade00 = grade.y,
+           pl00 = pl.y) %>%
     
-    # select students who had valid prior scores
-    filter(!is.na(year00)) %>%
+    # remove students who did not have valid current scores
+    filter(!is.na(pl01)) %>%
+    
+    # remove students who did not have valid prior scores
+    filter(!is.na(pl00)) %>%
+    
+    # remove students who were 12th graders at the time of identification
+    filter(!(grade00 == 12)) %>%
     
     # add targets based on the entry year's scores and grades
-    left_join(target, by = c("grade", "year00")) %>%
+    left_join(target, by = c("grade00" = "grade", "pl00" = "year00")) %>%
     select(-c(year02, year03, year04, year05)) %>%
     mutate(diff = pl01 - year01,
            met = diff >= 0,
            statecode = 0)
 
 head(year0100)
-nrow(year0100) # N = 35733
+nrow(year0100) # N = 35686
 
-write.csv(year0100, "year0100.csv", row.names = FALSE, na = "")
+# save outputs
+current_date <- Sys.Date()
+file_name <- paste0("Student 1-Year ELP Growth (2017-18) ", current_date, ".csv")
+write.csv(year0100, file = file_name, row.names = FALSE, na = "")
 
 
 ## Two-Year Growth ========================================================
@@ -168,8 +187,14 @@ year020100 <-
     left_join(target, c("grade01" = "grade", "pl01" = "year00")) %>%
     select(-c(year02, year03, year04, year05)) %>% 
     
+    # remove students who do not have valid current scores
+    filter(!(is.na(pl02))) %>%
+    
     # remove students who do not have any prior scores
-    filter(!(is.na(grade01) & is.na(grade00))) %>%
+    filter(!(is.na(pl01) & is.na(pl00))) %>%
+    
+    # remove students who were 12th graders at the time of identification
+    filter(!((grade00 == 12) | (grade01 == 12 & is.na(grade00)))) %>%
 
     # select targets based on when each student entered EL status
     mutate(target = ifelse(is.na(grade00), year01,
@@ -180,9 +205,12 @@ year020100 <-
 
 
 head(year020100)
-nrow(year020100) # N = 41028
+nrow(year020100) # N = 31801
 
-write.csv(year020100, "year020100.csv", row.names = FALSE, na = "")
+# save outputs
+current_date <- Sys.Date()
+file_name <- paste0("Student 2-Year ELP Growth (2017-19) ", current_date, ".csv")
+write.csv(year020100, file = file_name, row.names = FALSE, na = "")
 
 
 
@@ -252,36 +280,44 @@ state_level <- function(dataset) {
 
 # Run Functions -----------------------------------------------------------
 
-# one-year growth (SY 2017-2018)
-# run functions and sort columns in the same order in each file
-school_ELP_1 <- school_level(year0100) %>% select(sort(names(.)))
-district_ELP_1 <- district_level(year0100) %>% select(sort(names(.)))
-state_ELP_1 <- state_level(year0100) %>% select(sort(names(.)))
+## One-Year Growth (2017-2018) ============================================
+# run functions and sort columns in the same order in each output
+school_ELP_1 <- school_level(year0100) %>% 
+    select(sort(names(.)))
 
+district_ELP_1 <- district_level(year0100) %>% 
+    select(sort(names(.)))
+
+state_ELP_1 <- state_level(year0100) %>% 
+    select(sort(names(.)))
+
+# merge files
 final_1 <- rbind(school_ELP_1, district_ELP_1, state_ELP_1)
 head(final_1)
 
-
-# two-year growth (SY 2017-2018)
-school_ELP_2 <- school_level(year020100) %>% select(sort(names(.)))
-district_ELP_2 <- district_level(year020100) %>% select(sort(names(.)))
-state_ELP_2 <- state_level(year020100) %>% select(sort(names(.)))
-
-final_2 <- rbind(school_ELP_2, district_ELP_2, state_ELP_2)
-head(final_2)
-
-
-
-# Save Outputs ------------------------------------------------------------
-
-# one-year growth (SY 2017-2018)
+# save output
 current_date <- Sys.Date()
-file_name <- paste0("ELP Indicator 2017-2018 ", current_date, ".csv")
+file_name <- paste0("ELP Indicator Points 2017-18 ", current_date, ".csv")
 write.csv(final_1, file = file_name, row.names = FALSE, na = "")
 
 
-# two-year growth (SY 2018-2019)
-current_data <- Sys.Date()
-file_name <- paste0("ELP Indicator 2018-2019 ", current_date, ".csv")
+## Two-Year Growth (2017-2019) =========================================
+# run functions and sort columns in the same order in each output
+school_ELP_2 <- school_level(year020100) %>% 
+    select(sort(names(.)))
+
+district_ELP_2 <- district_level(year020100) %>% 
+    select(sort(names(.)))
+
+state_ELP_2 <- state_level(year020100) %>% 
+    select(sort(names(.)))
+
+# merge files
+final_2 <- rbind(school_ELP_2, district_ELP_2, state_ELP_2)
+head(final_2)
+
+# save outputs
+current_date <- Sys.Date()
+file_name <- paste0("ELP Indicator Points 2017-19 ", current_date, ".csv")
 write.csv(final_2, file = file_name, row.names = FALSE, na = "")
 
