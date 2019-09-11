@@ -1,5 +1,6 @@
 
-### ELP Indicator 201-2018
+# R Script for the ELP Indicator
+
 
 
 # Load Data ---------------------------------------------------------------
@@ -35,7 +36,8 @@ nrow(schools19) # N = 1802
 
 # Data Cleaning and Preparation -------------------------------------------
 
-# clean up year0
+## Tidy Year0 =============================================================
+
 year0 <- year0_raw %>%
     select(District.Number, School.Number, State.Student.ID, 
            Grade, Composite..Overall..Proficiency.Level) %>%
@@ -57,8 +59,11 @@ head(year0)
 range(year0$stid) # valid
 year0[duplicated(year0$stid), ] # no duplicates
 
+# check grades
+table(year0$grade) # 0-12
 
-# clean up year1
+
+## Tidy Year1 =============================================================
 year1 <- year1_raw %>%
     select(test_schnumb, distcode, schcode, stid, grade, PL_composite) %>%
     mutate(schnumb = test_schnumb,
@@ -73,12 +78,15 @@ head(year1)
 range(year1$stid) # valid
 year1[duplicated(year1$stid), ] # no duplicates
 
+# check grades
+table(year1$grade) # 0-12
 
-# clean up year2
+
+## Tidy Year2 =============================================================
 year2 <- year2_raw %>%
-    select(test_schnumb, distcode, schcode, stid, test_grade_read, PL_composite) %>%
+    select(test_schnumb, distcode, schcode, stid, STARS_grade, PL_composite) %>%
     mutate(schnumb = test_schnumb,
-           grade = test_grade_read,
+           grade = STARS_grade,
            pl = PL_composite,
            sy = 2019) %>%
     select(distcode, schcode, schnumb, stid, grade, pl, sy) %>%
@@ -90,13 +98,16 @@ head(year2)
 range(year2$stid) # valid
 year2[duplicated(year2$stid), ] # no duplicates
 
+# check grades
+table(year2$grade) # 0-12
+
 
 
 # Merge Multi-Year Data Files ---------------------------------------------
 
-################################################################################
-# one-year growth: merge year0 and year1 and add target scores
-# SY 2016-2017
+## One-Year Growth ========================================================
+
+# merge year0 and year1; then add target scores for SY 2016-2017
 year0100 <- left_join(year1, year0, by = "stid") %>%
     select(distcode.x, schcode.x, schnumb.x, stid, grade.x, pl.x, grade.y, pl.y) %>%
     rename(distcode = distcode.x,
@@ -122,12 +133,13 @@ nrow(year0100) # N = 35733
 
 write.csv(year0100, "year0100.csv", row.names = FALSE, na = "")
 
-################################################################################
-# Three-Year Growth: merge year0, year1, and year2 and add target scores
-# SY 2018-2019
 
-# merge year2 and year1
-year020100 <- left_join(year2, year1, by = "stid") %>%
+## Two-Year Growth ========================================================
+
+# merge year0, year1, and year2; then add target scores for SY2018-2019
+year020100 <- 
+    # merge year2 and year1
+    left_join(year2, year1, by = "stid") %>%
     select(distcode.x, schcode.x, schnumb.x, stid, grade.x, pl.x, grade.y, pl.y) %>%
     rename(distcode = distcode.x,
            schcode = schcode.x,
@@ -170,11 +182,14 @@ year020100 <- left_join(year2, year1, by = "stid") %>%
 head(year020100)
 nrow(year020100) # N = 41028
 
+write.csv(year020100, "year020100.csv", row.names = FALSE, na = "")
 
 
-# Define Functions --------------------------------------------------------
 
-# ELP_indicator
+
+# Functions for Calculating Rates and Points ------------------------------
+
+## Function for Calculating Percent Met ===================================
 ELP_indicator <- function(dataset, code) {
     dataset %>%
         select(code, distcode, schcode, stid, diff, met) %>%
@@ -184,6 +199,9 @@ ELP_indicator <- function(dataset, code) {
                   mean_diff = mean(diff),
                   n_students = n())
 }
+
+
+## Function for Calculating Points ========================================
 
 # school_level
 school_level <- function(dataset) {
