@@ -214,10 +214,10 @@ state_level <- function(dataset) {
         rename(distcode = `dataset[[code]]`) %>%
         mutate(schcode = 0,
                schnumb = 0,
-               AGAID = NA,
+               agaid = NA,
                distname = "Statewide",
                schname = "Statewide",
-               HS = NA,
+               hs = NA,
                percent_met = percent_met * 100,
                total_points = NA,
                points = NA)    
@@ -228,29 +228,35 @@ state_level <- function(dataset) {
 # Run Functions -----------------------------------------------------------
 
 # one-year growth (SY 2017-2018)
-school_ELP_1 <- school_level(year0100)
-district_ELP_1 <- district_level(year0100)
-state_ELP_1 <- state_level(year0100)
+# run functions and sort columns in the same order in each file
+school_ELP_1 <- school_level(year0100) %>% select(sort(names(.)))
+district_ELP_1 <- district_level(year0100) %>% select(sort(names(.)))
+state_ELP_1 <- state_level(year0100) %>% select(sort(names(.)))
+
 final_1 <- rbind(school_ELP_1, district_ELP_1, state_ELP_1)
+head(final_1)
 
 
 # two-year growth (SY 2017-2018)
-school_ELP_2 <- school_level(year020100)
-district_ELP_2 <- district_level(year020100)
-state_ELP_2 <- state_level(year020100)
+school_ELP_2 <- school_level(year020100) %>% select(sort(names(.)))
+district_ELP_2 <- district_level(year020100) %>% select(sort(names(.)))
+state_ELP_2 <- state_level(year020100) %>% select(sort(names(.)))
+
+final_2 <- rbind(school_ELP_2, district_ELP_2, state_ELP_2)
+head(final_2)
 
 
-# Merge Result Files and Save Output --------------------------------------
-# merge files
-final <- rbind(school_level, district_level, state_level) %>%
-    arrange(schnumb)
 
-head(final)
+# Save Outputs ------------------------------------------------------------
 
-# save output
+# one-year growth (SY 2017-2018)
 date <- Sys.Date()
 file_name <- paste0("ELP Indicator 2017-2018 ", date, ".csv")
-write.csv(final, file = file_name, row.names = FALSE, na = "")
+write.csv(final_1, file = file_name, row.names = FALSE, na = "")
 
 
+# two-year growth (SY 2018-2019)
+data <- Sys.Date()
+file_name <- paste0("ELP Indicator 2018-2019 ", date, "csv")
+write.csv(final_2, file = file_name, row.names = FALSE, na = "")
 
