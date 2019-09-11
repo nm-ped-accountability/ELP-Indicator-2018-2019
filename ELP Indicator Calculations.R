@@ -1,5 +1,5 @@
-### ELP Indicator 201-2018
 
+### ELP Indicator 201-2018
 
 
 # Load Data ---------------------------------------------------------------
@@ -23,7 +23,13 @@ target <- read.csv("ELP targets 2019.csv",
 schools <- read.csv("Master Schools 2019 V4.csv",
                     header = TRUE, stringsAsFactors = FALSE)
 
-schools18 <- schools[schools$ï..SY == 2018, ]
+names(schools) <- tolower(names(schools))
+
+schools18 <- schools[schools$ï..sy == 2018, ]
+nrow(schools18) # N = 1788
+
+schools19 <- schools[schools$ï..sy == 2019, ]
+nrow(schools19) # N = 1802
 
 
 
@@ -33,6 +39,7 @@ schools18 <- schools[schools$ï..SY == 2018, ]
 year0 <- year0_raw %>%
     select(District.Number, School.Number, State.Student.ID, 
            Grade, Composite..Overall..Proficiency.Level) %>%
+    filter(!is.na(State.Student.ID)) %>%
     filter(!is.na(Composite..Overall..Proficiency.Level)) %>%
     mutate(distcode = as.numeric(gsub("NM", "", District.Number)),
            schcode = School.Number,
@@ -45,6 +52,9 @@ year0 <- year0_raw %>%
     filter(distcode < 600 & !is.na(pl)) # there are BIE schools in the file
 
 head(year0)
+
+# check IDs
+range(year0$stid)
 year0[duplicated(year0$stid), ] # no duplicates
 
 
@@ -58,6 +68,9 @@ year1 <- year1_raw %>%
     filter(distcode < 600 & !is.na(pl))
 
 head(year1)
+
+# check IDs
+range(year1$stid)
 year1[duplicated(year1$stid), ] # no duplicates
 
 
@@ -72,15 +85,18 @@ year2 <- year2_raw %>%
     filter(distcode < 600 & !is.na(pl))
 
 head(year2)
+
+# check IDs
+range(year2$stid)
 year2[duplicated(year2$stid), ] # no duplicates
 
 
 
-# Two-Year Growth (year0, year1) ------------------------------------------
+# Merge Multi-Year Data Files ---------------------------------------------
 
+
+# Two-Year Growth: merge year0 and year1 and add target scores
 # SY 2016-2017
-
-# merge year0 and year1 and add target scores
 year0100 <- left_join(year1, year0, by = "stid") %>%
     select(distcode.x, schcode.x, schnumb.x, stid, grade.x, pl.x, grade.y, pl.y) %>%
     rename(distcode = distcode.x,
@@ -98,75 +114,7 @@ year0100 <- left_join(year1, year0, by = "stid") %>%
 head(year0100)
 
 
-# define function
-ELP_indicator <- function(dataset, code) {
-    dataset %>%
-        select(code, distcode, schcode, stid, diff, met) %>%
-        group_by(dataset[[code]]) %>%
-        filter(!is.na(diff)) %>%
-        summarize(percent_met = mean(met),
-                  mean_diff = mean(diff),
-                  n_students = n())
-}
-
-
-# calculate school-level, district-level, and state-level rates
-school_level <- ELP_indicator(year0100, "schnumb") %>%
-    rename(schnumb = `dataset[[code]]`) %>%
-    left_join(schools18, by = "schnumb") %>%
-    select(schnumb, AGAID, distcode, distname, schcode, schname, HS, 
-           percent_met, mean_diff, n_students) %>%
-    mutate(total_points = ifelse(HS == "Y", 5, 
-                                 ifelse(HS == "N", 10, "no")),
-           points = as.numeric(total_points) * percent_met,
-           percent_met = percent_met * 100)
-
-head(school_level)
-
-district_level <- ELP_indicator(year0100, "distcode") %>%
-    rename(distcode = `dataset[[code]]`) %>%
-    left_join(schools18, by = "distcode") %>%
-    select(distcode, distname, percent_met, mean_diff, n_students) %>%
-    mutate(schnumb = distcode * 1000,
-           AGAID = NA,
-           schcode = 0,
-           schname = "Districtwide",
-           HS = NA,
-           percent_met = percent_met * 100,
-           total_points = NA,
-           points = NA)
-
-district_level <- district_level[!duplicated(district_level$distcode), ]
-
-head(district_level)
-
-state_level <- ELP_indicator(year0100, "statecode") %>%
-    rename(distcode = `dataset[[code]]`) %>%
-    mutate(schcode = 0,
-           schnumb = 0,
-           AGAID = NA,
-           distname = "Statewide",
-           schname = "Statewide",
-           HS = NA,
-           percent_met = percent_met * 100,
-           total_points = NA,
-           points = NA)
-
-head(state_level)
-
-final <- rbind(school_level, district_level, state_level) %>%
-    arrange(schnumb)
-
-head(final)
-
-# save output
-date <- Sys.Date()
-file_name <- paste0("ELP Indicator 2017-2018 ", date, ".csv")
-write.csv(final, file = file_name, row.names = FALSE, na = "")
-
-
-
-# Three-Year Growth (year0, year1, year2) ---------------------------------
+# Three-Year Growth: merge year0, year1, and year2 and add target scores
 
 # SY 2018-2019
 
@@ -186,3 +134,91 @@ year020100 <- left_join(year0201, year0, by = "stid") %>%
     select()
 
 names(year020100)
+
+
+# Define Functions --------------------------------------------------------
+
+
+# ELP_indicator
+ELP_indicator <- function(dataset, code) {
+    dataset %>%
+        select(code, distcode, schcode, stid, diff, met) %>%
+        group_by(dataset[[code]]) %>%
+        filter(!is.na(diff)) %>%
+        summarize(percent_met = mean(met),
+                  mean_diff = mean(diff),
+                  n_students = n())
+}
+
+
+# school_level
+school_level <- function(dataset) {
+    dat <- ELP_indicator(dataset, "schnumb") %>%
+        rename(schnumb = `dataset[[code]]`) %>%
+        left_join(schools18, by = "schnumb") %>%
+        select(schnumb, agaid, distcode, distname, schcode, schname, hs, 
+               percent_met, mean_diff, n_students) %>%
+        mutate(total_points = ifelse(hs == "Y", 5, 
+                                     ifelse(hs == "N", 10, "no")),
+               points = as.numeric(total_points) * percent_met,
+               percent_met = percent_met * 100)    
+}
+
+# district_level
+district_level <- ELP_indicator(year0100, "distcode") %>%
+    rename(distcode = `dataset[[code]]`) %>%
+    left_join(schools18, by = "distcode") %>%
+    select(distcode, distname, percent_met, mean_diff, n_students) %>%
+    mutate(schnumb = distcode * 1000,
+           AGAID = NA,
+           schcode = 0,
+           schname = "Districtwide",
+           HS = NA,
+           percent_met = percent_met * 100,
+           total_points = NA,
+           points = NA)
+
+district_level <- district_level[!duplicated(district_level$distcode), ]
+
+head(district_level)
+
+
+# state_level
+state_level <- ELP_indicator(year0100, "statecode") %>%
+    rename(distcode = `dataset[[code]]`) %>%
+    mutate(schcode = 0,
+           schnumb = 0,
+           AGAID = NA,
+           distname = "Statewide",
+           schname = "Statewide",
+           HS = NA,
+           percent_met = percent_met * 100,
+           total_points = NA,
+           points = NA)
+
+head(state_level)
+
+
+
+
+# Run Functions -----------------------------------------------------------
+
+school_ELP <- school_level(year0100)
+head(school_ELP)
+
+
+
+# Merge Result Files and Save Output --------------------------------------
+# merge files
+final <- rbind(school_level, district_level, state_level) %>%
+    arrange(schnumb)
+
+head(final)
+
+# save output
+date <- Sys.Date()
+file_name <- paste0("ELP Indicator 2017-2018 ", date, ".csv")
+write.csv(final, file = file_name, row.names = FALSE, na = "")
+
+
+
