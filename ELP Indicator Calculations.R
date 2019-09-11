@@ -94,7 +94,7 @@ year2[duplicated(year2$stid), ] # no duplicates
 
 # Merge Multi-Year Data Files ---------------------------------------------
 
-
+################################################################################
 # Two-Year Growth: merge year0 and year1 and add target scores
 # SY 2016-2017
 year0100 <- left_join(year1, year0, by = "stid") %>%
@@ -106,20 +106,21 @@ year0100 <- left_join(year1, year0, by = "stid") %>%
            pl01 = pl.x,
            grade = grade.y,
            year00 = pl.y) %>%
+    # add targets based on the entry year's scores and grades
     left_join(target, by = c("grade", "year00")) %>%
     mutate(diff = pl01 - year01,
            met = diff >= 0,
            statecode = 0)
 
 head(year0100)
+nrow(year0100) # N = 48054
 
-
+################################################################################
 # Three-Year Growth: merge year0, year1, and year2 and add target scores
-
 # SY 2018-2019
 
 # merge year2 and year1
-year0201 <- left_join(year2, year1, by = "stid") %>%
+year020100 <- left_join(year2, year1, by = "stid") %>%
     select(distcode.x, schcode.x, schnumb.x, stid, grade.x, pl.x, grade.y, pl.y) %>%
     rename(distcode = distcode.x,
            schcode = schcode.x,
@@ -127,13 +128,41 @@ year0201 <- left_join(year2, year1, by = "stid") %>%
            grade02 = grade.x,
            pl02 = pl.x,
            grade01 = grade.y,
-           pl01 = pl.y)
+           pl01 = pl.y) %>%
+    
+    # add prior2 scores and grades
+    left_join(year0, by = "stid") %>%
+    select(-c(distcode.y, schcode.y, schnumb.y, sy)) %>%
+    rename(distcode = distcode.x,
+           schcode = schcode.x,
+           schnumb = schnumb.x,
+           grade00 = grade,
+           pl00 = pl) %>%
+    
+    # add targets based on the entry year's scores and grades
+    left_join(target, c("grade00" = "grade", "pl00" = "year00")) %>%
+    select(-c(year03, year04, year05)) %>%
+    rename(year01_entry_year = year01,
+           year02_entry_year = year02) %>%
+    
+    # add targets based on the 1st year's scores and grades
+    left_join(target, c("grade01" = "grade", "pl01" = "year00")) %>%
+    select(-c(year02, year03, year04, year05)) %>% 
+    
+    # remove students who do not have any prior scores
+    filter(!(is.na(grade01) & is.na(grade00))) %>%
 
-# merge year0201 and year0
-year020100 <- left_join(year0201, year0, by = "stid") %>%
-    select()
+    # select targets based on when each student entered EL status
+    mutate(target = ifelse(is.na(grade00), year01,
+                           ifelse(!is.na(grade00), year02_entry_year, "no")),
+           diff = pl02 - as.numeric(target),
+           met = diff >= 0,
+           statecode = 0)
 
-names(year020100)
+
+head(year020100)
+nrow(year020100) # N = 41028
+
 
 
 # Define Functions --------------------------------------------------------
@@ -198,11 +227,17 @@ state_level <- function(dataset) {
 
 # Run Functions -----------------------------------------------------------
 
-# two-year growth (SY 2017-2018)
-school_ELP <- school_level(year0100)
-district_ELP <- district_level(year0100)
-state_ELP <- state_level(year0100)
+# one-year growth (SY 2017-2018)
+school_ELP_1 <- school_level(year0100)
+district_ELP_1 <- district_level(year0100)
+state_ELP_1 <- state_level(year0100)
+final_1 <- rbind(school_ELP_1, district_ELP_1, state_ELP_1)
 
+
+# two-year growth (SY 2017-2018)
+school_ELP_2 <- school_level(year020100)
+district_ELP_2 <- district_level(year020100)
+state_ELP_2 <- state_level(year020100)
 
 
 # Merge Result Files and Save Output --------------------------------------
