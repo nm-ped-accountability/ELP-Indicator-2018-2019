@@ -54,7 +54,7 @@ year0 <- year0_raw %>%
 head(year0)
 
 # check IDs
-range(year0$stid)
+range(year0$stid) # valid
 year0[duplicated(year0$stid), ] # no duplicates
 
 
@@ -70,7 +70,7 @@ year1 <- year1_raw %>%
 head(year1)
 
 # check IDs
-range(year1$stid)
+range(year1$stid) # valid
 year1[duplicated(year1$stid), ] # no duplicates
 
 
@@ -87,7 +87,7 @@ year2 <- year2_raw %>%
 head(year2)
 
 # check IDs
-range(year2$stid)
+range(year2$stid) # valid
 year2[duplicated(year2$stid), ] # no duplicates
 
 
@@ -95,7 +95,7 @@ year2[duplicated(year2$stid), ] # no duplicates
 # Merge Multi-Year Data Files ---------------------------------------------
 
 ################################################################################
-# Two-Year Growth: merge year0 and year1 and add target scores
+# one-year growth: merge year0 and year1 and add target scores
 # SY 2016-2017
 year0100 <- left_join(year1, year0, by = "stid") %>%
     select(distcode.x, schcode.x, schnumb.x, stid, grade.x, pl.x, grade.y, pl.y) %>%
@@ -106,14 +106,21 @@ year0100 <- left_join(year1, year0, by = "stid") %>%
            pl01 = pl.x,
            grade = grade.y,
            year00 = pl.y) %>%
+    
+    # select students who had valid prior scores
+    filter(!is.na(year00)) %>%
+    
     # add targets based on the entry year's scores and grades
     left_join(target, by = c("grade", "year00")) %>%
+    select(-c(year02, year03, year04, year05)) %>%
     mutate(diff = pl01 - year01,
            met = diff >= 0,
            statecode = 0)
 
 head(year0100)
-nrow(year0100) # N = 48054
+nrow(year0100) # N = 35733
+
+write.csv(year0100, "year0100.csv", row.names = FALSE, na = "")
 
 ################################################################################
 # Three-Year Growth: merge year0, year1, and year2 and add target scores
