@@ -128,6 +128,14 @@ year0100 <- left_join(year1, year0, by = "stid") %>%
            grade00 = grade.y,
            pl00 = pl.y) %>%
     
+    # add targets based on the entry year's scores and grades
+    left_join(target, by = c("grade00" = "grade", "pl00" = "year00")) %>%
+    select(-c(year02, year03, year04, year05)) %>%
+    rename(target = year01) %>%
+    mutate(diff = pl01 - target,
+           met = diff >= 0,
+           statecode = 0) %>%
+    
     # remove students who did not have valid current scores
     filter(!is.na(pl01)) %>%
     
@@ -135,14 +143,7 @@ year0100 <- left_join(year1, year0, by = "stid") %>%
     filter(!is.na(pl00)) %>%
     
     # remove students who were 12th graders at the time of identification
-    filter(!(grade00 == 12)) %>%
-    
-    # add targets based on the entry year's scores and grades
-    left_join(target, by = c("grade00" = "grade", "pl00" = "year00")) %>%
-    select(-c(year02, year03, year04, year05)) %>%
-    mutate(diff = pl01 - year01,
-           met = diff >= 0,
-           statecode = 0)
+    filter(!(grade00 == 12))
 
 head(year0100)
 nrow(year0100) # N = 35686
@@ -179,14 +180,21 @@ year020100 <-
     
     # add targets based on the entry year's scores and grades
     left_join(target, c("grade00" = "grade", "pl00" = "year00")) %>%
-    select(-c(year03, year04, year05)) %>%
-    rename(year01_entry_year = year01,
-           year02_entry_year = year02) %>%
+    select(-c(year01, year03, year04, year05)) %>%
+    rename(target_year00 = year02) %>%
     
     # add targets based on the 1st year's scores and grades
     left_join(target, c("grade01" = "grade", "pl01" = "year00")) %>%
     select(-c(year02, year03, year04, year05)) %>% 
+    rename(target_year01 = year01) %>%
     
+    # select targets based on when each student entered EL status
+    mutate(target = ifelse(is.na(grade00), target_year01,
+                           ifelse(!is.na(grade00), target_year00, "no")),
+           diff = pl02 - as.numeric(target),
+           met = diff >= 0,
+           statecode = 0) %>%
+
     # remove students who do not have valid current scores
     filter(!is.na(pl02)) %>%
     
@@ -195,14 +203,8 @@ year020100 <-
     
     # remove students who were 12th graders at the time of first valid score
     filter(is.na(grade00) | grade00 < 12) %>%
-    filter(is.na(grade01) | !(is.na(grade00) & grade01 == 12)) %>%
+    filter(is.na(grade01) | !(is.na(grade00) & grade01 == 12))
 
-    # select targets based on when each student entered EL status
-    mutate(target = ifelse(is.na(grade00), year01,
-                           ifelse(!is.na(grade00), year02_entry_year, "no")),
-           diff = pl02 - as.numeric(target),
-           met = diff >= 0,
-           statecode = 0)
 
 
 head(year020100)
@@ -238,9 +240,8 @@ school_level <- function(dataset) {
         left_join(schools18, by = "schnumb") %>%
         select(schnumb, agaid, distcode, distname, schcode, schname, hs, 
                percent_met, mean_diff, n_students) %>%
-        mutate(total_points = ifelse(hs == "Y", 5, 
-                                     ifelse(hs == "N", 10, "no")),
-               points = as.numeric(total_points) * percent_met,
+        mutate(max_points = ifelse(hs == "Y", 5, ifelse(hs == "N", 10, "no")),
+               points = as.numeric(max_points) * percent_met,
                percent_met = percent_met * 100)    
 }
 
@@ -256,7 +257,7 @@ district_level <- function(dataset) {
                schname = "Districtwide",
                hs = NA,
                percent_met = percent_met * 100,
-               total_points = NA,
+               max_points = NA,
                points = NA)
         dat <- dat[!duplicated(dat$distcode), ]
 }
@@ -272,7 +273,7 @@ state_level <- function(dataset) {
                schname = "Statewide",
                hs = NA,
                percent_met = percent_met * 100,
-               total_points = NA,
+               max_points = NA,
                points = NA)    
 }
 
@@ -291,9 +292,12 @@ district_ELP_1 <- district_level(year0100) %>%
 state_ELP_1 <- state_level(year0100) %>% 
     select(sort(names(.)))
 
-# merge files
-final_1 <- rbind(school_ELP_1, district_ELP_1, state_ELP_1)
+final_1 <- 
+    # merge school, district, and state files
+    rbind(school_ELP_1, district_ELP_1, state_ELP_1) %>%
+    
 head(final_1)
+
 
 # save output
 current_date <- Sys.Date()
@@ -312,8 +316,17 @@ district_ELP_2 <- district_level(year020100) %>%
 state_ELP_2 <- state_level(year020100) %>% 
     select(sort(names(.)))
 
-# merge files
-final_2 <- rbind(school_ELP_2, district_ELP_2, state_ELP_2)
+final_2 <- 
+    # merge school, district, and state files
+    rbind(school_ELP_2, district_ELP_2, state_ELP_2) %>%
+    
+    # remove columns that are not needed
+    select(agaid, schnumb, distcode, distname, schcode, schname,
+           hs, max_points, percent_met, points, n_students) %>%
+    
+    # sort records by schnumb
+    arrange(schnumb)
+
 head(final_2)
 
 # save outputs
