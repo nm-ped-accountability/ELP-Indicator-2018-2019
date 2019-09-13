@@ -143,15 +143,19 @@ year0100 <- left_join(year1, year0, by = "stid") %>%
     filter(!is.na(pl00)) %>%
     
     # remove students who were 12th graders at the time of identification
-    filter(!(grade00 == 12))
+    filter(!(grade00 == 12)) %>%
+    
+    # remove students who score 5.0 or higher at the time of identification
+    filter(pl00 < 5.0)
 
 head(year0100)
-nrow(year0100) # N = 35686
+nrow(year0100) # N = 35637
 
 # save outputs
 current_date <- Sys.Date()
 file_name <- paste0("Student 1-Year ELP Growth (2017-18) ", current_date, ".csv")
 write.csv(year0100, file = file_name, row.names = FALSE, na = "")
+
 
 
 ## Two-Year Growth ========================================================
@@ -201,14 +205,18 @@ year020100 <-
     # remove students who do not have any prior scores
     filter(!(is.na(pl00) & is.na(pl01))) %>%
     
-    # remove students who were 12th graders at the time of first valid score
+    # remove students who were 12th graders at the time of identification
     filter(is.na(grade00) | grade00 < 12) %>%
-    filter(is.na(grade01) | !(is.na(grade00) & grade01 == 12))
+    filter(is.na(grade01) | !(is.na(grade00) & grade01 == 12)) %>%
+    
+    # remove students who scored 5.0 or higher in previous years
+    filter(is.na(pl00) | pl00 < 5.0) %>%
+    filter(is.na(pl01) | pl01 < 5.0)
 
 
 
 head(year020100)
-nrow(year020100) # N = 41008
+nrow(year020100) # N = 40938
 
 # save outputs
 current_date <- Sys.Date()
