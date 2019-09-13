@@ -193,9 +193,9 @@ year020100 <-
     # remove students who do not have any prior scores
     filter(!(is.na(pl00) & is.na(pl01))) %>%
     
-    # remove students who were 12th graders at the time of identification
-    
-    # filter(!((grade00 == 12) | (grade01 == 12 & is.na(grade00)))) %>%
+    # remove students who were 12th graders at the time of first valid score
+    filter(is.na(grade00) | grade00 < 12) %>%
+    filter(is.na(grade01) | !(is.na(grade00) & grade01 == 12)) %>%
 
     # select targets based on when each student entered EL status
     mutate(target = ifelse(is.na(grade00), year01,
@@ -206,16 +206,13 @@ year020100 <-
 
 
 head(year020100)
-nrow(year020100) # N = 31801
+nrow(year020100) # N = 41008
 
 # save outputs
 current_date <- Sys.Date()
 file_name <- paste0("Student 2-Year ELP Growth (2017-19) ", current_date, ".csv")
 write.csv(year020100, file = file_name, row.names = FALSE, na = "")
 
-year020100[is.na(year020100$pl00) & !is.na(year020100$pl01),]
-year020100[is.na(year020100$pl01) & !is.na(year020100$pl00), ]
-year020100[is.na(year020100$pl00) & is.na(year020100$pl01), ]
 
 
 # Functions for Calculating Rates and Points ------------------------------
